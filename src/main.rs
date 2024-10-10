@@ -1,45 +1,18 @@
-use std::time::{Duration, Instant};
-
-use iced::advanced::graphics::futures::backend::default::time;
 use iced::event::{self, Event};
+use iced::time::every;
 use iced::widget::{
     button, checkbox, column, combo_box, container, horizontal_rule, horizontal_space, row,
     scrollable, stack, text, text_input, tooltip, vertical_rule, vertical_space,
 };
-use iced::window;
 use iced::{alignment, Alignment, Element, Font, Length, Padding, Subscription, Task, Theme};
+use iced::{window, Color};
 use serde::Deserialize;
+use std::time::{Duration, Instant};
+pub mod colors;
 pub mod error;
-use chrono::{Local, NaiveTime};
+pub mod time;
 use error::*;
-
-fn format_time(iso_time: &str) -> String {
-    let datetime: iso8601::DateTime = iso8601::datetime(iso_time).unwrap();
-    let mut h = datetime.time.hour.to_string();
-    let mut m = datetime.time.minute.to_string();
-
-    if h.len() == 1 {
-        h.insert(0, '0');
-    }
-    if m.len() == 1 {
-        m.insert(0, '0');
-    }
-
-    let s = String::from(format!("{}:{}", h, m));
-    s
-}
-
-fn get_delta_time(iso_time: &str) -> String {
-    let dep_time =
-        NaiveTime::parse_from_str(&format_time(iso_time), "%H:%M").expect("invalid format");
-    let now = Local::now().time();
-    let delta_minutes = if now < dep_time {
-        dep_time.signed_duration_since(now).num_minutes()
-    } else {
-        now.signed_duration_since(dep_time).num_minutes()
-    };
-    return delta_minutes.to_string();
-}
+use time::*;
 #[tokio::main]
 async fn main() -> iced::Result {
     iced::application(App::title, App::update, App::view)
@@ -111,10 +84,14 @@ enum Status {
 #[derive(Debug, Deserialize)]
 struct Settings {
     filter: bool,
+    fontsize: f32,
 }
 impl Settings {
     pub fn default() -> Self {
-        Settings { filter: false }
+        Settings {
+            filter: false,
+            fontsize: 30.0,
+        }
     }
 }
 
@@ -141,7 +118,7 @@ impl App {
         String::from("Application")
     }
     fn subscription(&self) -> Subscription<Message> {
-        time::every(Duration::from_secs(5)).map(Message::Send)
+        every(Duration::from_secs(5)).map(Message::Send)
     }
     fn update(&mut self, message: Message) -> Task<Message> {
         match message {
@@ -158,26 +135,56 @@ impl App {
     }
 
     fn view(&self) -> Element<Message> {
-        let mut list = column![]
-            .width(Length::Fill)
-            .height(Length::Fill)
-            .spacing(10);
+        let mut list = column![].width(Length::Fill).height(Length::Fill);
 
         for dep in &self.deps {
             let time_text = match &self.showDelta {
-                true => text(get_delta_time(&dep.stop.departure)),
-                false => text(format_time(&dep.stop.departure)),
+                true => text(get_delta_time(&dep.stop.departure))
+                    .size(self.settings.fontsize)
+                    .color(Color::WHITE),
+                false => text(format_time(&dep.stop.departure))
+                    .size(self.settings.fontsize)
+                    .color(Color::WHITE),
+            };
+            let icon = container(
+                text(dep.number.clone())
+                    .color(iced::Color::BLACK)
+                    .size(self.settings.fontsize),
+            )
+            .padding(20)
+            .width(Length::Fixed(150.0))
+            .style(|theme: &Theme| {
+                container::dark(theme).background(colors::line_color(&dep.number))
+            })
+            .align_y(Alignment::Center)
+            .align_x(Alignment::Center);
+
+            let delaytime = match dep.stop.delay {
+                Some(v) => v,
+                None => 0,
+            };
+            let delay_t = text(format!("+{}", delaytime))
+                .size(self.settings.fontsize)
+                .color(Color::WHITE);
+            let delay = if delaytime <= 2 {
+                delay_t
+            } else {
+                delay_t.color(colors::from_rgb(255.0, 0.0, 0.0))
             };
             list = list.push(container(
                 row![
-                    text(dep.number.clone()),
+                    icon,
                     horizontal_space(),
-                    text(dep.to.clone()),
+                    text(dep.to.clone())
+                        .size(self.settings.fontsize)
+                        .color(Color::WHITE),
                     horizontal_space(),
-                    time_text
+                    time_text,
+                    horizontal_space().width(20.0),
+                    delay,
                 ]
+                .padding(3)
                 .align_y(Alignment::Center)
-                .padding(10)
                 .spacing(5),
             ));
         }
@@ -186,7 +193,9 @@ impl App {
     }
 
     fn theme(&self) -> Theme {
-        Theme::Dark
+        let mut default = Theme::Dark.palette();
+        default.background = colors::from_rgb(7.0, 121.0, 204.0);
+        Theme::custom("ZVV".to_string(), default)
     }
 }
 
