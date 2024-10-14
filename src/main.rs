@@ -1,3 +1,4 @@
+use iced::advanced::graphics::core::SmolStr;
 use iced::event::{self, Event};
 use iced::time::every;
 use iced::widget::{
@@ -7,6 +8,7 @@ use iced::widget::{
 use iced::{alignment, Alignment, Element, Font, Length, Padding, Subscription, Task, Theme};
 use iced::{window, Color};
 use serde::Deserialize;
+use std::process::exit;
 use std::time::{Duration, Instant};
 pub mod colors;
 pub mod error;
@@ -74,6 +76,7 @@ async fn fetch_data(filter_endpoint: bool) -> Result<Vec<Departure>, Error> {
 enum Message {
     Send(Instant),
     Recieve(Result<Vec<Departure>, Error>),
+    Event(Event),
 }
 
 enum Status {
@@ -118,7 +121,10 @@ impl App {
         String::from("Application")
     }
     fn subscription(&self) -> Subscription<Message> {
-        every(Duration::from_secs(5)).map(Message::Send)
+        Subscription::batch(vec![
+            every(Duration::from_secs(5)).map(Message::Send),
+            event::listen().map(Message::Event),
+        ])
     }
     fn update(&mut self, message: Message) -> Task<Message> {
         match message {
@@ -129,6 +135,24 @@ impl App {
             Message::Recieve(val) => match val {
                 Err(_) => self.status = Status::Error,
                 Ok(data) => self.deps = data,
+            },
+            Message::Event(e) => match e {
+                Event::Keyboard(k) => match k {
+                    iced::keyboard::Event::KeyPressed {
+                        key,
+                        modified_key,
+                        physical_key,
+                        location,
+                        modifiers,
+                        text,
+                    } => {
+                        if key.eq(&iced::keyboard::Key::Character(SmolStr::from("q"))) {
+                            exit(0)
+                        };
+                    }
+                    _ => (),
+                },
+                _ => (),
             },
         }
         Task::none()
