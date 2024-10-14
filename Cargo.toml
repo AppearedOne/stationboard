@@ -5,7 +5,7 @@ edition = "2021"
 
 [dependencies]
 chrono = "0.4.38"
-iced = { git = "https://github.com/iced-rs/iced/", branch = "master", features = ["tokio", "advanced", "tiny-skia"] }
+iced = { git = "https://github.com/iced-rs/iced/", branch = "master", features = ["tokio", "advanced", "webgl"] }
 iso8601 = "0.6.1"
 reqwest = {version = "0.12.8", features = ["json"]}
 serde = { version = "1.0.203", features = ["derive"] }
